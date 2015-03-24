@@ -1,6 +1,6 @@
 {
   "name": "sails-dynamodb",
-  "version": "0.11.4",
+  "version": "0.12.0",
   "description": "Amazon DynamoDB adapter for Sails / Waterline",
   "main": "index.js",
   "scripts": {
@@ -23,7 +23,7 @@
   "author": "gadelkareem",
   "license": "MIT",
   "dependencies": {
-    "vogels": "0.12.0",
+    "vogels": "~0.12.0",
     "lodash": "",
     "async": ""
   },
@@ -58,9 +58,48 @@
     "email": "gadelkareem@gmail.com"
   },
   "maintainers": [
-    "gadelkareem <gadelkareem@gmail.com>"
+    "gadelkareem <gadelkareem@gmail.com>",
+    "devinivy <devin@bigroomstudios.com>"
   ],
   "directories": {
     "test": "test"
-  }
+  },
+  "contributors": [
+    {
+      "name": "Waleed Gadelkareem",
+      "email": "gadelkareem@gmail.com",
+      "url": "https://github.com/gadelkareem",
+      "contributions": 27,
+      "additions": 1975,
+      "deletions": 1842,
+      "hireable": false
+    },
+    {
+      "name": "Mike McNeil",
+      "email": "customers@balderdash.co",
+      "url": "https://github.com/mikermcneil",
+      "contributions": 31,
+      "additions": 1371,
+      "deletions": 725,
+      "hireable": true
+    },
+    {
+      "name": "devin ivy",
+      "email": "devin@bigroomstudios.com",
+      "url": "https://github.com/devinivy",
+      "contributions": 14,
+      "additions": 586,
+      "deletions": 245,
+      "hireable": false
+    },
+    {
+      "name": "dozo",
+      "email": "",
+      "url": "https://github.com/dohzoh",
+      "contributions": 46,
+      "additions": 943,
+      "deletions": 517,
+      "hireable": false
+    }
+  ]
 }

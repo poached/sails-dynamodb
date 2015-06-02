@@ -334,7 +334,8 @@ module.exports = (function () {
         AWS.config.update({
           "accessKeyId": connection.accessKeyId,
           "secretAccessKey": connection.secretAccessKey,
-          "region": connection.region
+          "region": connection.region,
+          "endpoint": connection.endPoint
         });
       } catch (e) {
         

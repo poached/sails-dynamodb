@@ -34,7 +34,7 @@ module.exports.adapters = {
     adapter: "sails-dynamodb",
     accessKeyId: process.env.DYNAMO_ACCESS_KEY_ID,
     secretAccessKey: process.env.DYNAMO_SECRET_ACCESS_KEY,
-    region: "us-west-1"
+    region: "us-west-1",
     endPoint: "http://localhost:8000", // Optional: add for DynamoDB local
   },
   

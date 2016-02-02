@@ -336,7 +336,7 @@ module.exports = (function () {
           "secretAccessKey": connection.secretAccessKey,
           "region": connection.region,
           "endpoint": connection.endPoint,
-	  "logger": connection.logger
+    "logger": connection.logger
         });
       } catch (e) {
         
@@ -513,10 +513,11 @@ module.exports = (function () {
       //sails.log.silly("::option", options);
 
       var collection = _collectionReferences[collectionName],
-        model = adapter._getModel(collectionName),
-        query = null,
+        model        = adapter._getModel(collectionName),
+        query        = null,
         error;
         
+
       // Options object is normalized for you:
       //
       // options.where
@@ -530,20 +531,16 @@ module.exports = (function () {
 
       if (options && 'where' in options && _.isObject(options.where)) {
         
-        query = null;
+        var wheres    = options.where,
+            whereExt  = this._getSubQueryWhereConditions(options),
+            indexing  = adapter._whichIndex(collectionName, ((whereExt) ? whereExt : wheres )),
+            hash      = indexing.hash,
+            range     = indexing.range,
+            indexName = indexing.index,
+            scanning  = false;
 
-        // get current condition
-        var wheres = _.keys(options.where);
-        
-        var indexing = adapter._whichIndex(collectionName, wheres);
-        var hash = indexing.hash;
-        var range = indexing.range;
-        var indexName = indexing.index;
-        
-        var scanning = false;
         if (indexing) {
-          
-          query = model.query(options.where[hash])
+           query = model.query(options.where[hash])
           delete options.where[hash];
           
           if (indexName && indexName != 'primary') {
@@ -556,16 +553,14 @@ module.exports = (function () {
             if (error) return cb(error);
             
             delete options.where[range];
-          }          
+          }
           
         } else {
-          
           scanning = true;
           query = model.scan();
         }
 
         var queryOp = scanning ? 'where' : 'filter';
-        
         for (var key in options.where) {
           
           // Using startKey?
@@ -580,34 +575,76 @@ module.exports = (function () {
             }
             
           } else {
-            
-            error = adapter._applyQueryFilter(query, queryOp, key, options.where[key]);
-            if (error) return cb(error);
+
+            var condition = (whereExt) ? whereExt : options.where[key];
+            if (whereExt) {
+              for (var subKey in condition) {
+                error = adapter._applyQueryFilter(query, queryOp, subKey, condition[subKey]);
+                if (error) return cb(error);
+              }
+              options.where = whereExt;
+            } else {
+              error = adapter._applyQueryFilter(query, queryOp, key, condition);
+              if (error) return cb(error);
+            }
           }
-                    
         }
       }
-      
+
       query = adapter._searchCondition(query, options, model);
-      
       query.exec(function (err, res) {
         if (!err) {
-          //console.log("success", adapter._resultFormat(res));
           adapter._valueDecode(collection.definition, res.attrs);
           cb(null, adapter._resultFormat(res));
         }
         else {
-          //sails.log.error('Error exec query:' + __filename, err);
           cb(err);
         }
       });
+    },
 
-      // Respond with an error, or the results.
-//      cb(null, []);
+    /**
+     * _getSubQueryWhereConditions
+     * @description :: Handle where objects that contain subquery arrays (i.e: and: [], or: [], etc).
+     *                 For consistency, This is useful when using dynamo and mongo data connections 
+     *                 in the same project.
+     * @author      :: Matt McCarty (https://github.com/mattmccarty) 
+     * @param       :: object 
+     * @return      :: Object filled with 'where' values or false
+     */
+    _getSubQueryWhereConditions: function(options) {
+        var wheresCurrent = _.keys(options.where),
+            wheres        = [],
+            whereExt      = false;
+
+        for (var key in wheresCurrent) {
+          var where = options.where[wheresCurrent[key]];
+          if (!_.isArray(where)) {
+            wheres.push(wheresCurrent[key]);
+            continue;
+          }
+
+          for (var arrKey in where) {
+            if (typeof where[arrKey] !== 'object') {
+              continue;
+            }
+
+            var subKeys = _.keys(where[arrKey]);
+
+            // Concat unique keys
+            wheres = _.union(wheres, subKeys);
+
+            for (var subKey in subKeys) {
+              if (!whereExt) whereExt   = {};
+              whereExt[subKeys[subKey]] = where[arrKey][subKeys[subKey]];
+            }
+          }
+        }
+
+        return whereExt;
     },
     
     _applyQueryFilter: function(query, op, key, condition) {
-      
         try {
           
           if (_.isString(condition) || _.isNumber(condition)) {
@@ -615,19 +652,16 @@ module.exports = (function () {
             query[op](key).equals(condition);
             
           } else if (_.isArray(condition)) {
-            
             query[op](key).in(condition);
             
           } else if (_.isObject(condition)) {
             
             var filter = _.keys(condition)[0];
-            
+
             if (filter in filters) {
-              
               query[op](key)[filter](filters[filter] ? condition[filter] : null);
               
             } else {
-              
               throw new Error("Wrong filter given :" + filter);
             }
             
@@ -637,10 +671,9 @@ module.exports = (function () {
           }
           
         } catch (e) {
-          
+
           return e;
         }
-                      
     },
     
     // Return {index: 'name', hash: 'field1', range:'field2'}
@@ -671,7 +704,7 @@ module.exports = (function () {
         
         fieldName = fields[i];
         column = columns[fieldName];
-        
+
         // set primary hash
         if (column.primaryKey && column.primaryKey === true || column.primaryKey === 'hash') {
           primaryHash = fieldName;
@@ -789,7 +822,6 @@ module.exports = (function () {
      * @private
      */
     _searchCondition: function (query, options, model) {
-      
       if (!query) {
         query = model.scan();
       }
@@ -818,7 +850,7 @@ module.exports = (function () {
         
         query.loadAll();
       }
-      
+
       return query;
     },
 
@@ -1208,4 +1240,3 @@ module.exports = (function () {
   return adapter;
 
 })();
-

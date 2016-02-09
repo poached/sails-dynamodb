@@ -336,7 +336,7 @@ module.exports = (function () {
           "secretAccessKey": connection.secretAccessKey,
           "region": connection.region,
           "endpoint": connection.endPoint,
-    "logger": connection.logger
+          "logger": connection.logger
         });
       } catch (e) {
         

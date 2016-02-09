@@ -613,15 +613,21 @@ module.exports = (function () {
      * @return      :: Object filled with 'where' values or false
      */
     _getSubQueryWhereConditions: function(options) {
-        var wheresCurrent = _.keys(options.where),
-            wheres        = [],
-            whereExt      = false;
+        var wheresCurrent       = _.keys(options.where),
+            conditionalOperator = 'AND',
+            wheres              = [],
+            whereExt            = false,
+            count               = 0;
 
         for (var key in wheresCurrent) {
           var where = options.where[wheresCurrent[key]];
           if (!_.isArray(where)) {
             wheres.push(wheresCurrent[key]);
             continue;
+          }
+
+          if (typeof wheresCurrent[key] === 'string' && wheresCurrent[key].toUpperCase() === 'OR') {
+              conditionalOperator =  'OR';
           }
 
           for (var arrKey in where) {
@@ -637,8 +643,13 @@ module.exports = (function () {
             for (var subKey in subKeys) {
               if (!whereExt) whereExt   = {};
               whereExt[subKeys[subKey]] = where[arrKey][subKeys[subKey]];
+              count++;
             }
           }
+        }
+
+        if (whereExt && count > 1) {
+            whereExt.ConditionalOperator = conditionalOperator;
         }
 
         return whereExt;
@@ -646,8 +657,10 @@ module.exports = (function () {
     
     _applyQueryFilter: function(query, op, key, condition) {
         try {
-          
-          if (_.isString(condition) || _.isNumber(condition)) {
+
+          if (key === 'ConditionalOperator' && query.request) {
+            query.request.ConditionalOperator = condition;
+          } else if (_.isString(condition) || _.isNumber(condition)) {
             
             query[op](key).equals(condition);
             

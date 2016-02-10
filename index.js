@@ -592,8 +592,41 @@ module.exports = (function () {
       }
 
       query = adapter._searchCondition(query, options, model);
-      query.exec(function (err, res) {
+      this._findQuery(adapter, collection, query, false, cb);
+    },
+
+    /**
+     * _findQuery
+     * @description :: Return result if found. If not and the developer set a limit
+                       on the number of entries to return, then we must keep
+                       scanning the DB until the end is reached or until a result is returned
+     * @author      :: Matt McCarty (https://github.com/mattmccarty) 
+     * @param       :: object   adapter     - Current sails-dynamodb instance
+     * @param       :: object   collection  - Collection reference
+     * @param       :: object   query       - Current query
+     * @param       :: object   startKey    - Contains primary key of record where the search should start
+     * @param       :: function callback
+     * @return      :: callback(err, results)
+     */
+    _findQuery: function(adapter, collection, query, startKey, cb) {
+      var _self = this;
+
+      if (startKey) {
+        query.request = query.request || {};
+        query.request.ExclusiveStartKey = startKey;
+      }
+
+      query.exec(function(err, res) {
         if (!err) {
+          // The developer requested a specific number of items, so loop over each DB entry
+          // until the end of the db table is reached or until a result is found
+          if (res && res.Count <= 0 && res.LastEvaluatedKey && res.LastEvaluatedKey.id) {
+            var lastKey = {
+              id: { S: res.LastEvaluatedKey.id },
+            }
+            return adapter._findQuery(adapter, collection, query, lastKey, cb);
+          }
+          
           adapter._valueDecode(collection.definition, res.attrs);
           cb(null, adapter._resultFormat(res));
         }

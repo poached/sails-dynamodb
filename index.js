@@ -212,6 +212,15 @@ module.exports = (function () {
       
       // Cache Vogels model
       _vogelsReferences[collectionName] = vogelsModel;
+
+      Vogels.createTables(function (err) {
+        if (err) {
+          console.log('Error creating tables: ', err);
+        } else {
+          console.log('Tables have been created');
+        }
+      });
+
       
       return vogelsModel;
       
@@ -925,6 +934,7 @@ module.exports = (function () {
       var current = Model.create(values, function (err, res) {
         if (err) {
           //sails.log.error(__filename + ", create error:", err);
+          err.stack = '';
           cb(err);
         }
         else {

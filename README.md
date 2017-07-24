@@ -67,7 +67,12 @@ Support for where is added as following:
   ?where={"name":{"contains":"firstName lastName"}}
   ?where={"name":{"beginsWith":"firstName"}}
   ?where={"name":{"in":["firstName lastName", "another name"]}}
-  ?where={"name":{"between":["firstName, "lastName"]}}
+  ?where={"name":{"between":["firstName", "lastName"]}}
+```
+You can specify what attributes/keys should be returned from the query as following:
+```
+  //This will return only name and age in the result (if the field exists in the result)
+  ?where={"name":{"equals":"firstName lastName"}, "select": ["name","age"]}
 ```
 
 ### Pagination
@@ -174,7 +179,7 @@ Multiple GSIs:
 GameTitle: {
   type: 'string',
   primaryKey: 'hash'
-  index: ['GameTitleIndex-hash'. 'SomeOtherIndex-hash']
+  index: ['GameTitleIndex-hash', 'SomeOtherIndex-hash']
 }
 ```
 
@@ -183,7 +188,7 @@ Multiple GSIs and a secondary index:
 GameTitle: {
   type: 'string',
   primaryKey: 'hash'
-  index: ['secondary', GameTitleIndex-hash'. 'SomeOtherIndex-hash']
+  index: ['secondary', 'GameTitleIndex-hash', 'SomeOtherIndex-hash']
 }
 ```
 

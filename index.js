@@ -36,7 +36,7 @@ var filters = {
   beginsWith: true,
   //?where={"name":{"in":["firstName lastName", "another name"]}}
   in: true,
-  //?where={"name":{"between":["firstName, "lastName""]}}
+  //?where={"name":{"between":["firstName", "lastName"]}}
   between: true
 };
 
@@ -949,6 +949,14 @@ module.exports = (function () {
       } else {
 
         query.loadAll();
+      }
+
+      if ('select' in options) {
+        if (_.isString(options.select)) {
+          query = query.attributes([options.select]);
+        } else {
+          query = query.attributes(options.select);
+        }
       }
 
       return query;

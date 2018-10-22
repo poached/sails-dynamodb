@@ -337,6 +337,10 @@ module.exports = (function () {
 
     },
 
+    getPrimaryKeys: function(connection, collectionName) {
+      return adapter._getPrimaryKeys(collectionName);
+    },
+
     /**
      *
      * This method runs when a model is initially registered

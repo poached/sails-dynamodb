@@ -24,12 +24,12 @@ config/connection.js
 ```javascript
 module.exports.adapters = {
 
-  // If you leave the adapter config unspecified 
+  // If you leave the adapter config unspecified
   // in a model definition, 'default' will be used.
   localDiskDb: {
     adapter: 'sails-disk'
   },
-  
+
   dynamoDb: {
     adapter: "sails-dynamodb",
     accessKeyId: process.env.DYNAMO_ACCESS_KEY_ID,
@@ -37,7 +37,7 @@ module.exports.adapters = {
     region: "us-west-1",
     endPoint: "http://localhost:8000", // Optional: add for DynamoDB local
   },
-  
+
 };
 ```
 
@@ -45,10 +45,10 @@ config/models.js
 ```javascript
 module.exports.adapters = {
 
-  // If you leave the adapter config unspecified 
+  // If you leave the adapter config unspecified
   // in a model definition, 'default' will be used.
   connection: 'dynamoDb'
-  
+
 };
 ```
 
@@ -86,7 +86,7 @@ See: [DynamoDB Documentation](http://docs.aws.amazon.com/amazondynamodb/latest/A
 ```
 /user?limit=2
 ```
-    
+
 2. Then get the last primaryKey value and send it as startKey in the next request
 
 ```
@@ -142,54 +142,45 @@ GameTitle: {
   primaryKey: 'range'
 }
 ```
-#### Secondary range (local secondary index)
-The index name used for a local secondary index is the name of the field suffixed by "Index".  In this case the index name is `TimeIndex`.
+#### Secondary Indexes (local and global)
+Secondary indexes can be specified by adding an `indexes` block to the model definition alongside the `attributes` section. Local secondary indexes use the same `hashKey` as the primary hashkey;  global secondary indexes use a differnt attribute as the `haskKey`.
 ```
-Time: {
-  type: 'datetime',
-  index: 'secondary'
-}
-```
-#### Global secondary index
-The index name used for a global secondary index is specified in the `index` property before the type of key (`hash` or `range`).  In this case the index name is `GameTitleIndex`.
-```
-GameTitle: {
-  type: 'string',
-  index: 'GameTitleIndex-hash'
+attributes: {
+  id: {
+    type: 'string',
+    primaryKey: 'hash'
+  },
+  timestamp: {
+    type: 'integer',
+    primaryKey: 'range'
+  },
+  name: {
+    type: 'string'
+  },
+  createdAt: {
+    type: 'date'
+  }
 },
-HighScore: {
-  type: 'integer',
-  index: 'GameTitleIndex-range'
+indexes: {
+  ExampleLocalIndex: {
+    hashKey: 'id',
+    rangeKey: 'name'
+  },
+  ExampleGlobalIndex: {
+    hashKey: 'name',
+    rangeKey: 'createdAt'
+  }
 }
 ```
+### Generated Ids
+Unique ids can be automatically assigned by adding `autoIncrement: true` to the field attributes. The field type must be a string and the assigned id is a UUID not an incrementing integer (DynamoDB has no ability to auto-increment.)
 
-#### Fields with multiple indexes
-A field can be both the primary and part of a GSI index. Participating in multiple GSI indexes is supported as of v0.12.5.
-
 ```
-GameTitle: {
-  type: 'string',
-  primaryKey: 'hash'
-  index: 'GameTitleIndex-hash'
-}
-```
-
-Multiple GSIs:
-```
-GameTitle: {
-  type: 'string',
-  primaryKey: 'hash'
-  index: ['GameTitleIndex-hash', 'SomeOtherIndex-hash']
-}
-```
-
-Multiple GSIs and a secondary index:
-```
-GameTitle: {
-  type: 'string',
-  primaryKey: 'hash'
-  index: ['secondary', 'GameTitleIndex-hash', 'SomeOtherIndex-hash']
-}
+  id: {
+    type: 'string',
+    primaryKey: 'hash',
+    autoIncrement: true
+  }
 ```
 
 ### Sorting By Indexes
@@ -205,6 +196,9 @@ GameScores.find({
 
 ## Update
 The `Model.update` method is currently expected to update exactly one item since DynamoDB only offers an [UpdateItem](http://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_UpdateItem.html) endpoint.  A complete primary key must be supplied.  Any additional "where" conditions passed to `Model.update` are used to build a conditional expression for the update.  Despite the fact the DynamoDB updates only one item, `Model.update` will always return an array of the (one or zero) updated items upon success.
+
+## Overwrite
+By default, an `InvalidAttribute` error will be thrown when attempting to insert a record with the same primary key(s) as an existing record. To overwrite existing records by default, add the model setting `overwrite: true` alongside the other top-level model settings.
 
 ## Testing
 
@@ -223,7 +217,7 @@ http://sailsjs.org
 Waterline is a new kind of storage and retrieval engine for Sails.js.  It provides a uniform API for accessing stuff from different kinds of databases, protocols, and 3rd party APIs.  That means you write the same code to get users, whether they live in mySQL, LDAP, MongoDB, or Facebook.
 
 
-![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png) 
+![image_squidhome@2x.png](http://i.imgur.com/RIvu9.png)
 
 ## License
 

@@ -39,6 +39,8 @@ var filters = {
   //?where={"name":{"between":["firstName", "lastName"]}}
   between: true
 };
+var Joi = require('joi');
+var tableNamePrefix;
 
 /**
  * Sails Boilerplate Adapter
@@ -135,6 +137,7 @@ module.exports = (function () {
 
       //Indices currently never change in dynamo
       migrate: 'safe',
+      overwrite: false
 //    schema: false
     },
 
@@ -156,84 +159,66 @@ module.exports = (function () {
       }
 
       // Vogels adds an 's'.  So let's remove an 's'.
-      var vogelsCollectionName  = collectionName[collectionName.length-1] === 's' ?
+      var vogelsCollectionName  = collectionName[collectionName.length-1] === 's'
+                                ? collectionName.slice(0, collectionName.length-1)
+                                : collectionName;
 
-                                      collectionName.slice(0, collectionName.length-1) :
-                                      collectionName;
+      // add prefix
+      vogelsCollectionName = tableNamePrefix + vogelsCollectionName;
 
-      var vogelsModel = Vogels.define(vogelsCollectionName, function (schema) {
+      var definition = {
+        schema: {}
+      };
 
-        var columns = collection.definition;
-
-        var indices = {};
-
-        // set columns
-        for (var columnName in columns) {
-
-          var attributes = columns[columnName];
-
-          if (typeof attributes !== "function") {
-
-            // Add column to Vogel model
-            adapter._setColumnType(schema, columnName, attributes);
-
-            // Save set indices
-            var index;
-            var indexParts;
-            var indexName;
-            var indexType;
-
-            if ("index" in attributes && attributes.index !== 'secondary') {
-
-              index = attributes.index;
-
-              if (_.isArray(index)){
-                index.forEach((oneIndex) => {
-                  indexParts = adapter._parseIndex(oneIndex, columnName);
-                  indexName = indexParts[0];
-                  indexType = indexParts[1];
-
-                  if (typeof indices[indexName] === 'undefined') {
-                    indices[indexName] = {};
-                  }
-
-                  indices[indexName][indexType] = columnName;
-                });
-              }else{
-                indexParts = adapter._parseIndex(index, columnName);
-                indexName = indexParts[0];
-                indexType = indexParts[1];
-
-                if (typeof indices[indexName] === 'undefined') {
-                  indices[indexName] = {};
-                }
-
-                indices[indexName][indexType] = columnName;
-              }
-
-            }
-
+      // set columns
+      var columns = collection.definition;
+      var hashKey;
+      for (var columnName in columns) {
+        var attributes = columns[columnName];
+        if (typeof attributes !== "function") {
+          // Add column to Vogel model
+          if (attributes.primaryKey === 'hash') {
+            hashKey = columnName;
           }
-
+          adapter._setColumnType(definition, columnName, attributes);
         }
+      }
 
-        // Set global secondary indices
-        for (indexName in indices) {
-          schema.globalIndex(indexName, indices[indexName]);
+      // Set secondary indexes
+      if (collection.indexes) {
+        definition.indexes = [];
+        for (var indexName in collection.indexes) {
+          var index = collection.indexes[indexName];
+          var indexType = index.hashKey === hashKey
+                        ? 'local' : 'global';
+          definition.indexes.push({
+            name: indexName,
+            hashKey: index.hashKey,
+            rangeKey: index.rangeKey,
+            type: indexType
+          });
         }
+      }
 
-      });
+      // Set global secondary indices
+      // for (indexName in indices) {
+      //   schema.globalIndex(indexName, indices[indexName]);
+      // }
+      var vogelsModel = Vogels.define(vogelsCollectionName, definition);
 
       // Cache Vogels model
       _vogelsReferences[collectionName] = vogelsModel;
 
-      Vogels.createTables(function (err) {
-        if (err) {
-          console.log('Error creating tables: ', err);
-        } else {
-          console.log('Tables have been created');
-        }
-      });
+      var migrate = collection.migrate || adapter.defaults.migrate;
+      if (migrate !== 'safe') {
+        Vogels.createTables(function (err) {
+          if (err) {
+            console.log('Error creating tables: ', err);
+          } else {
+            console.log('Tables have been created');
+          }
+        });
+      }
 
 
       return vogelsModel;
@@ -337,6 +322,10 @@ module.exports = (function () {
 
     },
 
+    getPrimaryKeys: function(connection, collectionName) {
+      return adapter._getPrimaryKeys(collectionName);
+    },
+
     /**
      *
      * This method runs when a model is initially registered
@@ -353,7 +342,6 @@ module.exports = (function () {
       if (connections[connection.identity]) return cb(Errors.IdentityDuplicate);
 
       try {
-
         AWS.config.update({
           "accessKeyId": connection.accessKeyId,
           "secretAccessKey": connection.secretAccessKey,
@@ -366,6 +354,8 @@ module.exports = (function () {
         e.message = e.message + ". Please make sure you added the right keys to your adapter config";
         return cb(e)
       }
+
+      tableNamePrefix = connection.prefix || "";
 
       // Keep a reference to these collections
       _collectionReferences = collections;
@@ -561,7 +551,6 @@ module.exports = (function () {
             range     = indexing.range,
             indexName = indexing.index,
             scanning  = false;
-
         if (indexing) {
           // console.log("USING INDEX")
           // console.log(indexing);
@@ -647,7 +636,7 @@ module.exports = (function () {
       query.exec(function(err, res) {
         if (!err) {
           // The developer requested a specific number of items, so loop over each DB entry
-          // until the end of the db table is reached or until a result is found
+          // until the end of the db table is reached or until a result is founds
           if (res && res.Count <= 0 && res.LastEvaluatedKey && res.LastEvaluatedKey.id) {
             var lastKey = {
               id: { S: res.LastEvaluatedKey.id },
@@ -712,7 +701,6 @@ module.exports = (function () {
         if (whereExt && count > 1) {
             whereExt.ConditionalOperator = conditionalOperator;
         }
-
         return whereExt;
     },
 
@@ -984,11 +972,27 @@ module.exports = (function () {
       adapter._valueEncode(collection.definition, values);
 
       // Create a single new model (specified by `values`)
-      var current = Model.create(values, function (err, res) {
+      var settings = {
+        overwrite: collection.overwrite || adapter.defaults.overwrite
+      };
+      var current = Model.create(values, settings, function (err, res) {
         if (err) {
-          //sails.log.error(__filename + ", create error:", err);
-          err.stack = '';
-          cb(err);
+          if (err.code === 'ConditionalCheckFailedException') {
+            // Duplicate record
+            var formattedErr = {};
+            formattedErr.code = 'E_UNIQUE';
+            formattedErr.invalidAttributes = {};
+            adapter._getPrimaryKeys(collectionName).forEach(key => {
+              formattedErr.invalidAttributes[key] = {
+                value: values[key],
+                rule: 'unique'
+              }
+            });
+            return cb(formattedErr)
+          } else {
+            err.stack = '';
+            cb(err);
+          }
         }
         else {
           adapter._valueDecode(collection.definition, res.attrs);
@@ -1219,25 +1223,19 @@ module.exports = (function () {
 
     /**
      * set column attributes
-     * @param schema  vogels::define return value
+     * @param definition  Definition to pass to vogels::define
      * @param name    column name
      * @param attr    columns detail
      * @private
      */
-     _setColumnType: function (schema, name, attr, options) {
-
+     _setColumnType: function (definition, name, attr, options) {
       options = (typeof options !== 'undefined') ? options : {};
 
       // Set primary key options
       if (attr.primaryKey === 'hash') {
-
-        _.merge(options, {hashKey: true});
+        definition.hashKey = name;
       } else if (attr.primaryKey === 'range') {
-
-        _.merge(options, {rangeKey: true});
-      } else if (attr.index === 'secondary') {
-
-        _.merge(options, {secondaryIndex: true});
+        definition.rangeKey = name;
       }
 
       // set columns
@@ -1249,42 +1247,38 @@ module.exports = (function () {
         case "date":
         case "time":
         case "datetime":
-//                  console.log("Set Date:", name);
-          schema.Date(name, options);
+          definition.schema[name] = Joi.date();
           break;
 
         case "integer":
+          if (attr.autoIncrement) {
+            definition.schema[name] = Vogels.types.uuid();
+          } else {
+            definition.schema[name] = Joi.number();
+          }
+          break;
+
         case "float":
-//                  console.log("Set Number:", name);
-          schema.Number(name, options);
+          definition.schema[name] = Joi.number();
           break;
 
         case "boolean":
-//                  console.log("Set Boolean:", name);
-          schema.Boolean(name, options);
+          definition.schema[name] = Joi.boolean();
           break;
 
-        case "array":  // not support
-          schema.StringSet(name, options);
+        case "array":
+          definition.schema[name] = Vogels.types.stringSet();
           break;
 
 //              case "json":
 //              case "string":
 //              case "binary":
         case "string":
-
-          if (attr.autoIncrement) {
-
-            schema.UUID(name, options);
-          } else {
-
-            schema.String(name, options);
-          }
+          definition.schema[name] = Joi.string();
           break;
 
         default:
-//                  console.log("Set String", name);
-          schema.String(name, options);
+          definition.schema[name] = Joi.string();
           break;
       }
     }
@@ -1300,7 +1294,6 @@ module.exports = (function () {
       for (var i in results.Items) {
         items.push(results.Items[i].attrs);
       }
-
 //console.log(items);
       return items;
     }
